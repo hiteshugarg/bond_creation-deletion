@@ -1,0 +1,74 @@
+units           lj
+dimension       3
+atom_style      full
+read_data       system.data
+bond_style      fene
+special_bonds   fene
+bond_coeff      1 30.00 1.50 1.00 1.00
+bond_coeff      2 30.00 1.50 1.00 1.00
+
+pair_style      lj/cut 2.50
+pair_modify     shift yes
+pair_coeff      1 1 1.0 1.0 2.5
+pair_coeff      1 2 1.0 1.0 2.5
+pair_coeff	    2 2 1.0 1.0 2.5
+
+
+
+neigh_modify    check yes delay 1 every 1
+comm_modify     cutoff 3.5
+
+# minimization algorithm
+#min_style       cg
+#minimize        1e-10 1e-10 1000 10000
+
+reset_timestep 56000
+
+fix             1 all npt temp 1.0 1.0 1.0 iso 0.0 0.0 5.0 
+
+fix             2 all momentum 100 linear 1 1 1
+run_style       verlet
+
+thermo_style    custom step temp press epair ebond pe spcpu
+timestep        0.005
+thermo          100
+
+variable        Ncl equal "bonds - 9500" 
+variable	s equal step
+
+run 1
+
+#---------------dumping coordinate after 1000 steps----------------
+#dump            10 all custom 1000 traj-8000-10000.lammpstrj id mol type x y z ix iy iz
+#dump_modify     10 sort id append yes
+#---------------print thermodynamic information----------------------
+variable dens equal density
+variable temp equal temp
+variable press equal press
+variable epair equal epair
+variable ebond equal ebond
+variable pe equal pe
+variable        therm string "thermo.data"
+fix             thermo all print 100 " $s  ${temp} ${press} ${epair} ${ebond} ${pe} ${dens}" append ${therm} title '' screen no
+
+#--------------dumping restart file after 10000 steps-----------------
+#variable        refile string "restart.data"
+#restart         1000 ${refile}
+
+#-----------dumping current trajectory after 1000 steps-----------------
+dump            11 all custom 1000 traj-current.lammpstrj id mol type x y z 
+dump_modify 11 sort id 
+
+# -------------- crosslink bond information ---------------------
+variable        bfile string "excess_bonds.txt"
+fix             extra all print 1000 " $s  ${Ncl} " append ${bfile} title '' screen no
+#--------------------------------------------- Surface Tension Run --------------------------------------
+
+compute 1 all property/local patom1 patom2
+compute 2 all pair/local dist eng force 
+dump distance all local 1000 pairdistance.dump index c_1[1] c_1[2] c_2[1] 
+
+run             999
+
+write_data system.data
+
